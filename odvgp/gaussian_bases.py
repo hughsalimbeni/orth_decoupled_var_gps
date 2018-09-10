@@ -24,7 +24,8 @@ from gpflow import settings
 from gpflow.features import InducingPoints
 
 
-add_jitter = lambda M: M + tf.eye(tf.shape(M)[1]) * settings.jitter
+add_jitter = lambda M: M + tf.eye(tf.shape(M)[1], dtype=settings.float_type) * settings.jitter
+
 
 class OthogonallyDecoupledBasis(Parameterized):
     """
@@ -76,11 +77,11 @@ class OthogonallyDecoupledBasis(Parameterized):
         # either (num_X, ) or (num_X, num_X)
         self.K_X = kernel.K(X) if full_cov else kernel.Kdiag(X)
 
-        self.K_beta              = self.beta.Kuu(kernel, jitter=1e-6)
+        self.K_beta              = self.beta.Kuu(kernel, jitter=settings.jitter)
         self.L_beta              = tf.cholesky(self.K_beta)
         self.K_beta_X            = self.beta.Kuf(kernel, X)
         self.K_gamma_beta        = self.gamma.Kuf(kernel, self.beta.Z)
-        self.K_gamma             = self.gamma.Kuu(kernel, jitter=1e-6)
+        self.K_gamma             = self.gamma.Kuu(kernel, jitter=settings.jitter)
         self.K_gamma_X           = self.gamma.Kuf(kernel, X)
 
         # (M_beta, M_gamma)
@@ -134,9 +135,12 @@ class OthogonallyDecoupledBasis(Parameterized):
 
     def build_a(self):
         # this is separated out to distinguish TrulyDecoupled from Decoupled, and for preconditioning gamma
-        a_gamma = self.a_gamma  # no preconditioning. Replace this line to precondition gamma
+        a_gamma = self.a_gamma #/ self.D  # preconditioning
         a_beta = tf.cholesky_solve(self.L_beta, self.a_beta) - tf.matmul(self.inv_K_beta_K_beta_gamma, a_gamma)
+        # a_beta = self.a_beta - tf.matmul(self.inv_K_beta_K_beta_gamma, a_gamma)
         return a_gamma, a_beta
+
+
 
     @params_as_tensors
     def conditional_with_KL(self, kernel, X, full_cov=False):
@@ -152,7 +156,7 @@ class OthogonallyDecoupledBasis(Parameterized):
             a2 = tf.concat([scale * tf.gather(a_gamma, self.gamma_indices), a_beta], 0)
 
 
-        KL = -0.5 * self.M_beta * self.num_latent
+        KL = -0.5 * tf.cast(self.M_beta * self.num_latent, dtype=tf.float64)
         KL -= 0.5 * tf.reduce_sum(tf.log(tf.matrix_diag_part(self.L)**2))
         KL += tf.reduce_sum(tf.log(tf.matrix_diag_part(self.L_beta))) * self.num_latent
         KL += 0.5 * tf.reduce_sum(tf.square(tf.matrix_triangular_solve(self.L_beta_tiled, self.L, lower=True)))
@@ -230,7 +234,7 @@ class DecoupledBasis(Parameterized):
 
     @params_as_tensors
     def conditional_with_KL(self, kernel, X, full_cov=False, scale_a=1.):
-        K_beta = self.beta.Kuu(kernel, jitter=1e-6)
+        K_beta = self.beta.Kuu(kernel, jitter=settings.jitter)
         K_X_beta = tf.transpose(self.beta.Kuf(kernel, X))
 
         a1 = self.a
@@ -281,3 +285,19 @@ class DecoupledBasis(Parameterized):
         KL -= 0.5 * tf.reduce_sum(K_beta_tiled * LHinvLT)
 
         return mean, var, KL
+
+
+class HybridDecoupledBasis(OthogonallyDecoupledBasis):
+    """
+    The basis from the appendix of
+
+    @inproceedings{cheng2017variational,
+      title={Variational Inference for Gaussian Process Models with Linear Complexity},
+      author={Cheng, Ching-An and Boots, Byron},
+      booktitle={Advances in Neural Information Processing Systems},
+      year={2017}
+    }
+
+    """
+    def build_a(self):
+        return self.a_gamma, tf.cholesky_solve(self.L_beta, self.a_beta)
