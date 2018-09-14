@@ -8,7 +8,7 @@ before_install:
   - sudo apt-get update -qq
 
 install:
-  - pip install numpy scipy tensorflow gpflow pytest pytest-xdist pytest-cov codecov
+  - pip install tensorflow gpflow pytest pytest-xdist pytest-cov codecov
   - python setup.py install
 
 script:
