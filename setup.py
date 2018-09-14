@@ -5,6 +5,7 @@ requirements = [
     'scipy>=0.18.0',
     'gpflow>=1.2',
     'tensorflow>=1.4',
+    'pytest',
 ]
 
 setup(name='orth_decoupled_var_gps',
@@ -21,6 +22,6 @@ setup(name='orth_decoupled_var_gps',
       classifiers=[
           'License :: OSI Approved :: Apache Software License',
           'Natural Language :: English',
-          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: 3.5',
           'Topic :: Scientific/Engineering :: Artificial Intelligence'
       ])
