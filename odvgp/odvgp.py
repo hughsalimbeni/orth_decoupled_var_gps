@@ -18,7 +18,7 @@ from gpflow.models import GPModel
 from gpflow.params.dataholders import DataHolder, Minibatch
 from gpflow import settings, params_as_tensors
 
-from .gaussian_bases import OthogonallyDecoupledBasis, DecoupledBasis
+from .gaussian_bases import OthogonallyDecoupledBasis, DecoupledBasis, HybridDecoupledBasis
 
 
 class Variational_GP(GPModel):
@@ -56,32 +56,83 @@ class Variational_GP(GPModel):
         return mu + self.mean_function(Xnew), var
 
 
-#### Convenience methods
-
-def decoupled_init(Basis, self, X, Y, kernel, likelihood, alpha, beta,
-                 minibatch_size=None,
-                 mean_function=None,
-                 gamma_minibatch_size=None,
-                 **kw):
-    num_latent = kw['num_latent'] if 'num_latent' in kw else Y.shape[1]
-
-    basis = Basis(num_latent, alpha, beta, minibatch_size=gamma_minibatch_size)
-    Variational_GP.__init__(self, X, Y, kernel, likelihood, basis,
-                            minibatch_size=minibatch_size,
-                            mean_function=mean_function)
+#### Convenience classses
 
 
 class ODVGP(Variational_GP):
     """
     Convenience class for a Variational GP with the orthogonally decoupled basis, from
+    
+    @inproceedings{salimbeni2018decoupled,
+      title={Orthogonally Decoupled Variational Gaussian Processes},
+      author={Salimbeni, Hugh and Cheng, Ching-An and Boots, Byron and Deisenroth, Marc},
+      booktitle={Advances in Neural Information Processing Systems},
+      year={2018}
+    }
+        
     """
-    def __init__(self, *args, **kwargs):
-        decoupled_init(OthogonallyDecoupledBasis, self, *args, **kwargs)
+    def __init__(self, X, Y, kernel, likelihood, alpha, beta,
+                 minibatch_size=None,
+                 mean_function=None,
+                 gamma_minibatch_size=None,
+                 **kwargs):
+        num_latent = kwargs['num_latent'] if 'num_latent' in kwargs else Y.shape[1]
+
+        basis = OthogonallyDecoupledBasis(num_latent, alpha, beta, minibatch_size=gamma_minibatch_size)
+
+        Variational_GP.__init__(self, X, Y, kernel, likelihood, basis,
+                                minibatch_size=minibatch_size,
+                                mean_function=mean_function,
+                                **kwargs)
+
 
 class DVGP(Variational_GP):
     """
     Convenience class for a Variational GP with the decoupled basis, from
+    
+    @inproceedings{cheng2017variational,
+      title={Variational Inference for Gaussian Process Models with Linear Complexity},
+      author={Cheng, Ching-An and Boots, Byron},
+      booktitle={Advances in Neural Information Processing Systems},
+      year={2017}
+    }
     """
-    def __init__(self, *args, **kwargs):
-        decoupled_init(DecoupledBasis, self, *args, ** kwargs)
+    def __init__(self, X, Y, kernel, likelihood, alpha, beta,
+                 minibatch_size=None,
+                 mean_function=None,
+                 gamma_minibatch_size=None,
+                 **kwargs):
+        num_latent = kwargs['num_latent'] if 'num_latent' in kwargs else Y.shape[1]
 
+        basis = DecoupledBasis(num_latent, alpha, beta, minibatch_size=gamma_minibatch_size)
+
+        Variational_GP.__init__(self, X, Y, kernel, likelihood, basis,
+                                minibatch_size=minibatch_size,
+                                mean_function=mean_function,
+                                **kwargs)
+
+
+class HDVGP(Variational_GP):
+    """
+    Convenience class for a Variational GP with the hybrid basis, from the appendix of
+    
+    @inproceedings{cheng2017variational,
+      title={Variational Inference for Gaussian Process Models with Linear Complexity},
+      author={Cheng, Ching-An and Boots, Byron},
+      booktitle={Advances in Neural Information Processing Systems},
+      year={2017}
+    }
+    """
+    def __init__(self, X, Y, kernel, likelihood, alpha, beta,
+                 minibatch_size=None,
+                 mean_function=None,
+                 gamma_minibatch_size=None,
+                 **kwargs):
+        num_latent = kwargs['num_latent'] if 'num_latent' in kwargs else Y.shape[1]
+
+        basis = HybridDecoupledBasis(num_latent, alpha, beta, minibatch_size=gamma_minibatch_size)
+
+        Variational_GP.__init__(self, X, Y, kernel, likelihood, basis,
+                                minibatch_size=minibatch_size,
+                                mean_function=mean_function,
+                                **kwargs)
