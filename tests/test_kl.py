@@ -25,7 +25,7 @@ from gpflow.test_util import session_tf
 from odvgp.gaussian_bases import DecoupledBasis, OthogonallyDecoupledBasis
 
 
-def ref_decoupled_KL(a, B, K_alpha, K_beta):
+def ref_decoupled_KL(a, Bshell, K_alpha, K_beta):
     """
     eq 9 of Cheng and Boots 2017
     """
