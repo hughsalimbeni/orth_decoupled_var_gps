@@ -2,13 +2,13 @@ sudo: required
 dist: trusty
 language: python
 python:
-  - 3.5
+  - 3.6
 
 before_install:
   - sudo apt-get update -qq
 
 install:
-  - pip install numpy scipy sklearn pandas pytest matplotlib pytest-xdist pytest-cov codecov ddt
+  - pip install numpy scipy pytest pytest-xdist pytest-cov codecov
   - python setup.py install
   - git clone https://github.com/GPflow/GPflow.git
   - cd GPflow
@@ -17,7 +17,7 @@ install:
 
 script:
   - pytest -W ignore::UserWarning --durations=50 --cov=./odvgp -d --tx 3*popen//python=python3.5 --pyargs ./tests
-  - codecov --token=fe99b84e-0656-4739-96b9-79f021477eac
+  - codecov --token=4ac7ec1d-3921-4378-be0e-ec6f774655d1
 
 cache:
   apt: true
