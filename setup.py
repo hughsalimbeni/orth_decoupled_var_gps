@@ -3,8 +3,8 @@ from setuptools import find_packages, setup
 requirements = [
     'numpy>=1.10.0',
     'scipy>=0.18.0',
-    'gpflow>=1.2',
     'tensorflow>=1.4',
+    'gpflow>=1.2',
     'pytest',
 ]
 
