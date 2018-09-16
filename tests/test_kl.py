@@ -18,6 +18,7 @@ import tensorflow as tf
 import numpy as np
 from numpy.testing import assert_allclose
 
+from gpflow import settings
 from gpflow.kernels import Matern52
 from gpflow.likelihoods import Gaussian
 from gpflow.test_util import session_tf
@@ -25,7 +26,7 @@ from gpflow.test_util import session_tf
 from odvgp.gaussian_bases import DecoupledBasis, OthogonallyDecoupledBasis, HybridDecoupledBasis
 
 
-def ref_decoupled_KL(a, Bshell, K_alpha, K_beta):
+def ref_decoupled_KL(a, B, K_alpha, K_beta):
     """
     eq 9 of Cheng and Boots 2017
     """
@@ -108,20 +109,23 @@ def test_orthogonally_decoupled_kl(session_tf):
     kernel = Matern52(Dx)
 
     K_gamma = kernel.compute_K_symm(gamma)
-    K_beta = kernel.compute_K_symm(beta) + np.eye(M_beta) * 1e-6
+    K_beta = kernel.compute_K_symm(beta) + np.eye(M_beta) * settings.jitter
     K_gamma_beta = kernel.compute_K(gamma, beta)
 
     a_gamma = np.random.randn(M_gamma, Dy)
     a_beta = np.random.randn(M_beta, Dy)
     U = np.random.randn(Dy, M_beta, M_beta)
-    S = np.einsum('dnN,dmN->dnm', U, U) + 1e-6 * np.eye(M_beta)[None, :, :]
+    S = np.einsum('dnN,dmN->dnm', U, U) + settings.jitter * np.eye(M_beta)[None, :, :]
     chol_S = np.linalg.cholesky(S)
 
     KL_ref = sum([ref_orthogonally_decoupled_KL(_a_gamma, _a_beta, _S, K_gamma, K_gamma_beta, K_beta)
                   for _a_gamma, _a_beta, _S in zip(a_gamma.T, a_beta.T, S)])
 
+    # undo the pre-conditioning
+    D = kernel.compute_Kdiag(gamma) - np.sum(K_gamma_beta.T * np.linalg.solve(K_beta, K_gamma_beta.T), 0)
+
     basis = OthogonallyDecoupledBasis(Dy, gamma, beta,
-                                      a_gamma=a_gamma, a_beta=K_beta @ a_beta, L=chol_S)
+                                      a_gamma=a_gamma * D[:, None], a_beta=K_beta @ a_beta, L=chol_S)
 
     _, _, kl = basis.conditional_with_KL(kernel, np.empty((1, Dx)))
     KL = session_tf.run(kl)

@@ -135,7 +135,7 @@ class OthogonallyDecoupledBasis(Parameterized):
 
     def build_a(self):
         # this is separated out to distinguish TrulyDecoupled from Decoupled, and for preconditioning gamma
-        a_gamma = self.a_gamma #/ self.D  # preconditioning
+        a_gamma = self.a_gamma / self.D  # preconditioning
         a_beta = tf.cholesky_solve(self.L_beta, self.a_beta) - tf.matmul(self.inv_K_beta_K_beta_gamma, a_gamma)
         # a_beta = self.a_beta - tf.matmul(self.inv_K_beta_K_beta_gamma, a_gamma)
         return a_gamma, a_beta
@@ -233,7 +233,7 @@ class DecoupledBasis(Parameterized):
         self.chol_B = Parameter(chol_B, transform=LowerTriangular(M_beta, D))
 
     @params_as_tensors
-    def conditional_with_KL(self, kernel, X, full_cov=False, scale_a=1.):
+    def conditional_with_KL(self, kernel, X, full_cov=False):
         K_beta = self.beta.Kuu(kernel, jitter=settings.jitter)
         K_X_beta = tf.transpose(self.beta.Kuf(kernel, X))
 
@@ -248,7 +248,7 @@ class DecoupledBasis(Parameterized):
         else:
             a2 = self.a
             scale_a2 = 1.
-            K_alpha = self.alpha.Kuu(kernel, jitter=0.)
+            K_alpha = self.alpha.Kuu(kernel)
 
         Dy, M_beta = tf.shape(self.a)[1], tf.shape(K_beta)[0]
         K_beta_tiled = tf.tile(K_beta[None, :, :], [Dy, 1, 1])
@@ -259,9 +259,9 @@ class DecoupledBasis(Parameterized):
 
         chol_H = tf.cholesky(H)
         chol_H_inv_LT = tf.matrix_triangular_solve(chol_H, tf.transpose(self.chol_B, [0, 2, 1]))
-        LHinvLT = tf.matmul(chol_H_inv_LT, chol_H_inv_LT, transpose_a=True)
+        # LHinvLT = tf.matmul(chol_H_inv_LT, chol_H_inv_LT, transpose_a=True)
 
-        # LHinvLT = tf.matmul(self.chol_B, tf.matrix_solve(H, tf.transpose(self.chol_B, [0, 2, 1])))  # Dy,M,M
+        LHinvLT = tf.matmul(self.chol_B, tf.matrix_solve(H, tf.transpose(self.chol_B, [0, 2, 1])))  # Dy,M,M
 
         if full_cov:
             KBK = tf.matmul(K_X_beta_tiled, tf.matmul(LHinvLT, K_X_beta_tiled, transpose_b=True))
@@ -278,9 +278,9 @@ class DecoupledBasis(Parameterized):
         var = tf.transpose(var)
 
         K_alpha_X = self.alpha.Kuf(kernel, X)
-        mean = tf.matmul(K_alpha_X, a1, transpose_a=True) * scale_a
+        mean = tf.matmul(K_alpha_X, a1, transpose_a=True)
 
-        KL = 0.5 * tf.reduce_sum(a2 * tf.matmul(K_alpha, a1)) * scale_a * scale_a2
+        KL = 0.5 * tf.reduce_sum(a2 * tf.matmul(K_alpha, a1)) * scale_a2
         KL += tf.reduce_sum(tf.log(tf.matrix_diag_part(chol_H)))
         KL -= 0.5 * tf.reduce_sum(K_beta_tiled * LHinvLT)
 
