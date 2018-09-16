@@ -27,7 +27,25 @@ from gpflow.features import InducingPoints
 add_jitter = lambda M: M + tf.eye(tf.shape(M)[1], dtype=settings.float_type) * settings.jitter
 
 
-class OthogonallyDecoupledBasis(Parameterized):
+class GaussianBasis(Parameterized):
+    """
+    Base class for the decoupled bases. The KL is implemented together with the conditional
+    (in gpflow.models.SVGP these are separate methods) as the required matrices are the same.
+    """
+    def __init__(self, **kwargs):
+        Parameterized.__init__(self, **kwargs)
+
+    def conditional_with_KL(self, X, full_cov=False):
+        """
+        The predictive mean and variance, and KL to the prior, returned as a tuple (mean, cov, KL)
+        :param X: the input locations (N, Dx)
+        :param full_cov: bool, whether to compute the full covariance or just the diagonals
+        :return: mean, var, KL
+        """
+        raise NotImplementedError
+
+
+class OrthogonallyDecoupledBasis(GaussianBasis):
     """
     The basis from
 
@@ -42,7 +60,7 @@ class OthogonallyDecoupledBasis(Parameterized):
                  a_gamma=None, a_beta=None, L=None,
                  minibatch_size=None,
                  **kwargs):
-        Parameterized.__init__(self, **kwargs)
+        GaussianBasis.__init__(self, **kwargs)
         self.num_latent = num_latent
 
         self.M_beta = len(beta)
@@ -73,7 +91,7 @@ class OthogonallyDecoupledBasis(Parameterized):
 
 
     @params_as_tensors
-    def build_kernels_matrices(self, kernel, X, full_cov):
+    def _build_kernels_matrices(self, kernel, X, full_cov):
         # either (num_X, ) or (num_X, num_X)
         self.K_X = kernel.K(X) if full_cov else kernel.Kdiag(X)
 
@@ -133,20 +151,18 @@ class OthogonallyDecoupledBasis(Parameterized):
 
         self.I = tf.tile(tf.eye(self.M_beta, dtype=tf.float64)[None, :, :], [self.num_latent, 1, 1])
 
-    def build_a(self):
+    def _build_a(self):
         # this is separated out to distinguish TrulyDecoupled from Decoupled, and for preconditioning gamma
         a_gamma = self.a_gamma / self.D  # preconditioning
         a_beta = tf.cholesky_solve(self.L_beta, self.a_beta) - tf.matmul(self.inv_K_beta_K_beta_gamma, a_gamma)
         # a_beta = self.a_beta - tf.matmul(self.inv_K_beta_K_beta_gamma, a_gamma)
         return a_gamma, a_beta
 
-
-
     @params_as_tensors
     def conditional_with_KL(self, kernel, X, full_cov=False):
-        self.build_kernels_matrices(kernel, X, full_cov)
+        self._build_kernels_matrices(kernel, X, full_cov)
 
-        a_gamma, a_beta = self.build_a()
+        a_gamma, a_beta = self._build_a()
         a = tf.concat([a_gamma, a_beta], 0)
         if self.gamma_indices is None:
             a2 = a
@@ -192,7 +208,7 @@ class OthogonallyDecoupledBasis(Parameterized):
         return mean, var, KL
 
 
-class DecoupledBasis(Parameterized):
+class DecoupledBasis(GaussianBasis):
     """
     The basis from
 
@@ -208,7 +224,7 @@ class DecoupledBasis(Parameterized):
                  a=None, chol_B=None,
                  minibatch_size=None,
                  **kwargs):
-        Parameterized.__init__(self, **kwargs)
+        GaussianBasis.__init__(self, **kwargs)
         self.num_latent = D
 
         self.alpha = InducingPoints(alpha)
@@ -287,7 +303,7 @@ class DecoupledBasis(Parameterized):
         return mean, var, KL
 
 
-class HybridDecoupledBasis(OthogonallyDecoupledBasis):
+class HybridDecoupledBasis(OrthogonallyDecoupledBasis):
     """
     The basis from the appendix of
 
@@ -299,5 +315,5 @@ class HybridDecoupledBasis(OthogonallyDecoupledBasis):
     }
 
     """
-    def build_a(self):
+    def _build_a(self):
         return self.a_gamma, tf.cholesky_solve(self.L_beta, self.a_beta)

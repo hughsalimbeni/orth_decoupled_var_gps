@@ -23,7 +23,7 @@ from gpflow.kernels import Matern52
 from gpflow.likelihoods import Gaussian
 from gpflow.test_util import session_tf
 
-from odvgp.gaussian_bases import DecoupledBasis, OthogonallyDecoupledBasis, HybridDecoupledBasis
+from odvgp.gaussian_bases import DecoupledBasis, OrthogonallyDecoupledBasis, HybridDecoupledBasis
 
 
 def ref_decoupled_KL(a, B, K_alpha, K_beta):
@@ -124,8 +124,8 @@ def test_orthogonally_decoupled_kl(session_tf):
     # undo the pre-conditioning
     D = kernel.compute_Kdiag(gamma) - np.sum(K_gamma_beta.T * np.linalg.solve(K_beta, K_gamma_beta.T), 0)
 
-    basis = OthogonallyDecoupledBasis(Dy, gamma, beta,
-                                      a_gamma=a_gamma * D[:, None], a_beta=K_beta @ a_beta, L=chol_S)
+    basis = OrthogonallyDecoupledBasis(Dy, gamma, beta,
+                                       a_gamma=a_gamma * D[:, None], a_beta=K_beta @ a_beta, L=chol_S)
 
     _, _, kl = basis.conditional_with_KL(kernel, np.empty((1, Dx)))
     KL = session_tf.run(kl)

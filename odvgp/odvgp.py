@@ -18,7 +18,7 @@ from gpflow.models import GPModel
 from gpflow.params.dataholders import DataHolder, Minibatch
 from gpflow import settings, params_as_tensors
 
-from .gaussian_bases import OthogonallyDecoupledBasis, DecoupledBasis, HybridDecoupledBasis
+from .gaussian_bases import OrthogonallyDecoupledBasis, DecoupledBasis, HybridDecoupledBasis
 
 
 class Variational_GP(GPModel):
@@ -78,7 +78,7 @@ class ODVGP(Variational_GP):
                  **kwargs):
         num_latent = kwargs['num_latent'] if 'num_latent' in kwargs else Y.shape[1]
 
-        basis = OthogonallyDecoupledBasis(num_latent, alpha, beta, minibatch_size=gamma_minibatch_size)
+        basis = OrthogonallyDecoupledBasis(num_latent, alpha, beta, minibatch_size=gamma_minibatch_size)
 
         Variational_GP.__init__(self, X, Y, kernel, likelihood, basis,
                                 minibatch_size=minibatch_size,
